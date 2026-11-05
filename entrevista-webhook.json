@@ -1,0 +1,48 @@
+{
+  "name": "Questionário hotéis → Postgres",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "entrevista",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "b1f0a3c2-1d2e-4f5a-9b6c-7d8e9f0a1b2c",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "entrevista-hoteis"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT salvar_entrevista($1::jsonb) AS id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.body) ] }}"
+        }
+      },
+      "id": "c2a1b4d3-2e3f-4a5b-8c7d-8e9f0a1b2c3d",
+      "name": "Salvar entrevista",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [240, 0],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "Postgres capitacao_hoteis"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Salvar entrevista", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "active": false
+}

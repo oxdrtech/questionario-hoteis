@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diagnóstico da Hospedagem</title>
+<meta name="description" content="Questionário rápido sobre a rotina do seu hotel ou pousada.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* ===================== CONFIGURAÇÃO =====================
+   Cole aqui a URL que recebe as entrevistas:
+   - um Webhook do n8n (ex.: https://seu-n8n.com/webhook/entrevista), ou
+   - a URL do Apps Script da planilha (termina em /exec).
+   Enquanto estiver vazia, as entrevistas ficam salvas só neste aparelho. */
+</style>
+<script>
+  const ENDPOINT = "https://main-n8n.6kc5ee.easypanel.host/webhook/entrevista";
+</script>
+<style>
+/* Layout: uma coluna estreita, tipo ficha de check-in, uma etapa por vez */
+:root{
+  --bg:#f3f6f5; --card:#ffffff; --ink:#15302c; --muted:#5b6f6b;
+  --line:#d6e0dd; --accent:#0e6b5e; --accent-ink:#ffffff; --soft:#e3efec; --err:#b42318;
+  --display:"Instrument Serif", Georgia, "Times New Roman", serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1716; --card:#16211f; --ink:#e4efec; --muted:#9db1ac;
+  --line:#2a3a37; --accent:#4cc3ad; --accent-ink:#06201c; --soft:#1d2d2a; --err:#f97066; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1716; --card:#16211f; --ink:#e4efec; --muted:#9db1ac;
+  --line:#2a3a37; --accent:#4cc3ad; --accent-ink:#06201c; --soft:#1d2d2a; --err:#f97066; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 48px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header .eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+h1{font:400 clamp(34px,7vw,46px)/1.05 var(--display);margin:6px 0 10px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:60ch}
+.progress{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{flex:1;height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:20%;background:var(--accent);transition:width .3s}
+form{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px}
+fieldset.step{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;min-width:0}
+legend{font:400 28px/1.15 var(--display);padding:0;margin-bottom:4px}
+.q{display:flex;flex-direction:column;gap:8px;min-width:0}
+.q > label, .q > .label{font-weight:600}
+.hint{font-size:13px;color:var(--muted);font-weight:400}
+.req::after{content:" *";color:var(--accent)}
+input[type=text],input[type=tel],input[type=email],select,textarea{
+  width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:11px 12px}
+textarea{min-height:96px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.opt input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.opt span{display:inline-block;padding:8px 13px;border:1px solid var(--line);border-radius:99px;font-size:14px;background:var(--bg);cursor:pointer;user-select:none}
+.opt input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.grid{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px 12px;background:var(--bg)}
+.row:nth-child(even){background:var(--soft)}
+.row .t{font-size:14px;min-width:0}
+.scale{display:flex;gap:4px}
+.scale .opt span{width:34px;height:34px;padding:0;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.legend-scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.nav{display:flex;justify-content:space-between;gap:12px;margin-top:28px}
+button{font:600 15px var(--body);border-radius:8px;padding:12px 20px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);margin-left:auto}
+button[disabled]{opacity:.6;cursor:wait}
+.error{color:var(--err);font-size:14px;min-height:1em;margin:12px 0 0}
+.done{text-align:center;padding:24px 8px}
+.done h2{font:400 34px/1.1 var(--display);margin:0 0 8px}
+.done p{color:var(--muted);margin:0 auto;max-width:44ch}
+.foot{font-size:12px;color:var(--muted);text-align:center}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.notes{border-top:1px dashed var(--line);padding-top:16px}
+.notes textarea{min-height:72px;background:var(--soft)}
+header .pending{margin-top:12px;font-size:14px;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header .pending button{padding:6px 12px;font-size:13px}
+@media (max-width:480px){.pair{grid-template-columns:1fr}}
+@media (max-width:480px){.row{grid-template-columns:1fr}.scale .opt span{width:40px;height:40px}form{padding:18px}}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Roteiro de entrevista · 15 minutos</div>
+    <h1>Diagnóstico da hospedagem</h1>
+    <p>Preencha junto com o dono ou gerente. Leia as perguntas em voz alta, deixe a pessoa falar e anote o que ela disser com as palavras dela no campo de notas de cada etapa.</p>
+    <p class="pending" id="pending" hidden></p>
+  </header>
+
+  <div class="progress" aria-live="polite"><span id="stepLabel">Etapa 1 de 5</span><div class="bar"><i id="barFill"></i></div></div>
+
+  <form id="f" novalidate>
+    <!-- ETAPA 1 -->
+    <fieldset class="step" data-step="1">
+      <legend>Sobre a hospedagem</legend>
+      <div class="pair">
+        <div class="q"><label for="id_lead">ID do lead <span class="hint">Do n8n, se tiver</span></label><input id="id_lead" name="id_lead" type="text"></div>
+        <div class="q"><label for="origem">Como chegou até ele</label><select id="origem" name="origem">
+          <option value="">Escolha</option><option>Captação n8n</option><option>Google Maps</option><option>Indicação</option><option>Visita espontânea</option><option>Instagram</option><option>Outro</option></select></div>
+      </div>
+      <div class="q"><label for="nome_hotel" class="req">Nome do hotel ou pousada</label><input id="nome_hotel" name="nome_hotel" type="text" required></div>
+      <div class="q"><label for="nome_pessoa" class="req">Seu nome</label><input id="nome_pessoa" name="nome_pessoa" type="text" required></div>
+      <div class="q"><span class="label">Sua função</span><div class="opts">
+        <label class="opt"><input type="radio" name="cargo" value="Dono/sócio"><span>Dono ou sócio</span></label>
+        <label class="opt"><input type="radio" name="cargo" value="Gerente"><span>Gerente</span></label>
+        <label class="opt"><input type="radio" name="cargo" value="Recepção"><span>Recepção</span></label>
+        <label class="opt"><input type="radio" name="cargo" value="Outro"><span>Outro</span></label></div></div>
+      <div class="q"><label for="cidade" class="req">Cidade e estado</label><input id="cidade" name="cidade" type="text" placeholder="Ex.: Paraty/RJ" required></div>
+      <div class="q"><span class="label">Tipo de hospedagem</span><div class="opts">
+        <label class="opt"><input type="radio" name="tipo" value="Pousada"><span>Pousada</span></label>
+        <label class="opt"><input type="radio" name="tipo" value="Hotel independente"><span>Hotel independente</span></label>
+        <label class="opt"><input type="radio" name="tipo" value="Hotel de rede/franquia"><span>Hotel de rede ou franquia</span></label>
+        <label class="opt"><input type="radio" name="tipo" value="Hostel"><span>Hostel</span></label>
+        <label class="opt"><input type="radio" name="tipo" value="Motel"><span>Motel</span></label>
+        <label class="opt"><input type="radio" name="tipo" value="Outro"><span>Outro</span></label></div></div>
+      <div class="q"><span class="label">Quantos quartos ou UHs?</span><div class="opts">
+        <label class="opt"><input type="radio" name="quartos" value="1-10"><span>1 a 10</span></label>
+        <label class="opt"><input type="radio" name="quartos" value="11-30"><span>11 a 30</span></label>
+        <label class="opt"><input type="radio" name="quartos" value="31-80"><span>31 a 80</span></label>
+        <label class="opt"><input type="radio" name="quartos" value="81+"><span>Mais de 80</span></label></div></div>
+    </fieldset>
+
+    <!-- ETAPA 2 -->
+    <fieldset class="step" data-step="2" hidden>
+      <legend>Reservas e canais de venda</legend>
+      <div class="q"><span class="label">Por onde chegam suas reservas? <span class="hint">Marque todos</span></span><div class="opts">
+        <label class="opt"><input type="checkbox" name="canais" value="Booking"><span>Booking</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Expedia"><span>Expedia</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Airbnb"><span>Airbnb</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Decolar"><span>Decolar</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="WhatsApp"><span>WhatsApp</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Instagram"><span>Instagram</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Telefone"><span>Telefone</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Site próprio"><span>Site próprio</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Agências"><span>Agências</span></label>
+        <label class="opt"><input type="checkbox" name="canais" value="Balcão"><span>Balcão</span></label></div></div>
+      <div class="q"><span class="label">Que parte das reservas vem de Booking, Expedia, Airbnb e similares?</span><div class="opts">
+        <label class="opt"><input type="radio" name="pct_ota" value="<20%"><span>Menos de 20%</span></label>
+        <label class="opt"><input type="radio" name="pct_ota" value="20-50%"><span>20 a 50%</span></label>
+        <label class="opt"><input type="radio" name="pct_ota" value="50-80%"><span>50 a 80%</span></label>
+        <label class="opt"><input type="radio" name="pct_ota" value=">80%"><span>Mais de 80%</span></label>
+        <label class="opt"><input type="radio" name="pct_ota" value="Não sei"><span>Não sei</span></label></div></div>
+      <div class="q"><span class="label">Quanto você paga de comissão para essas plataformas por mês, em média?</span><div class="opts">
+        <label class="opt"><input type="radio" name="comissao_mes" value="Até R$1 mil"><span>Até R$ 1 mil</span></label>
+        <label class="opt"><input type="radio" name="comissao_mes" value="R$1-5 mil"><span>R$ 1 a 5 mil</span></label>
+        <label class="opt"><input type="radio" name="comissao_mes" value="R$5-15 mil"><span>R$ 5 a 15 mil</span></label>
+        <label class="opt"><input type="radio" name="comissao_mes" value="Mais de R$15 mil"><span>Mais de R$ 15 mil</span></label>
+        <label class="opt"><input type="radio" name="comissao_mes" value="Não sei"><span>Não sei</span></label></div></div>
+      <div class="q"><span class="label">Seu site aceita reserva com pagamento online?</span><div class="opts">
+        <label class="opt"><input type="radio" name="reserva_direta" value="Sim, funciona bem"><span>Sim, funciona bem</span></label>
+        <label class="opt"><input type="radio" name="reserva_direta" value="Sim, mas pouco usado"><span>Sim, mas quase ninguém usa</span></label>
+        <label class="opt"><input type="radio" name="reserva_direta" value="Não"><span>Não</span></label>
+        <label class="opt"><input type="radio" name="reserva_direta" value="Não tenho site"><span>Não tenho site</span></label></div></div>
+    </fieldset>
+
+    <!-- ETAPA 3 -->
+    <fieldset class="step" data-step="3" hidden>
+      <legend>Atendimento e operação</legend>
+      <div class="q"><span class="label">Quanto tempo por dia sua equipe passa respondendo WhatsApp?</span><div class="opts">
+        <label class="opt"><input type="radio" name="whats_horas" value="<1h"><span>Menos de 1h</span></label>
+        <label class="opt"><input type="radio" name="whats_horas" value="1-3h"><span>1 a 3h</span></label>
+        <label class="opt"><input type="radio" name="whats_horas" value="3-5h"><span>3 a 5h</span></label>
+        <label class="opt"><input type="radio" name="whats_horas" value=">5h"><span>Mais de 5h</span></label></div></div>
+      <div class="q"><span class="label">E as mensagens que chegam à noite ou no fim de semana?</span><div class="opts">
+        <label class="opt"><input type="radio" name="whats_fora" value="Respondemos na hora"><span>Respondemos na hora</span></label>
+        <label class="opt"><input type="radio" name="whats_fora" value="Respondemos depois"><span>Respondemos no dia seguinte</span></label>
+        <label class="opt"><input type="radio" name="whats_fora" value="Perdemos clientes"><span>Perdemos clientes por demora</span></label></div></div>
+      <div class="q"><span class="label">Como você controla as reservas hoje?</span><div class="opts">
+        <label class="opt"><input type="radio" name="controle" value="Caderno"><span>Caderno</span></label>
+        <label class="opt"><input type="radio" name="controle" value="Planilha"><span>Planilha</span></label>
+        <label class="opt"><input type="radio" name="controle" value="Sistema (PMS)"><span>Sistema de gestão</span></label>
+        <label class="opt"><input type="radio" name="controle" value="Só pelas plataformas"><span>Só pelas plataformas</span></label></div></div>
+      <div class="q"><label for="sistema_nome">Se usa algum sistema, qual? <span class="hint">E do que não gosta nele</span></label><input id="sistema_nome" name="sistema_nome" type="text"></div>
+      <div class="q"><span class="label">Já vendeu o mesmo quarto duas vezes (overbooking)?</span><div class="opts">
+        <label class="opt"><input type="radio" name="overbooking" value="Nunca"><span>Nunca</span></label>
+        <label class="opt"><input type="radio" name="overbooking" value="Já aconteceu"><span>Já aconteceu</span></label>
+        <label class="opt"><input type="radio" name="overbooking" value="Frequente"><span>Acontece com frequência</span></label></div></div>
+      <div class="q"><span class="label">Como você define o preço da diária?</span><div class="opts">
+        <label class="opt"><input type="radio" name="preco" value="Fixo o ano todo"><span>Mesmo preço o ano todo</span></label>
+        <label class="opt"><input type="radio" name="preco" value="Manual por temporada"><span>Ajusto por temporada</span></label>
+        <label class="opt"><input type="radio" name="preco" value="Olho concorrentes"><span>Olho os concorrentes</span></label>
+        <label class="opt"><input type="radio" name="preco" value="Ferramenta"><span>Uso uma ferramenta</span></label></div></div>
+    </fieldset>
+
+    <!-- ETAPA 4 -->
+    <fieldset class="step" data-step="4" hidden>
+      <legend>Pagamento, burocracia e equipe</legend>
+      <div class="q"><span class="label">Como você cobra o sinal ou a reserva?</span><div class="opts">
+        <label class="opt"><input type="radio" name="sinal" value="Pix manual"><span>Mando a chave Pix e confiro</span></label>
+        <label class="opt"><input type="radio" name="sinal" value="Link automático"><span>Link de pagamento automático</span></label>
+        <label class="opt"><input type="radio" name="sinal" value="Pela plataforma"><span>Pela plataforma</span></label>
+        <label class="opt"><input type="radio" name="sinal" value="Não cobro"><span>Não cobro</span></label></div></div>
+      <div class="q"><span class="label">Hóspede que reserva e não aparece (no-show)</span><div class="opts">
+        <label class="opt"><input type="radio" name="noshow" value="Raro"><span>É raro</span></label>
+        <label class="opt"><input type="radio" name="noshow" value="Às vezes"><span>Às vezes</span></label>
+        <label class="opt"><input type="radio" name="noshow" value="Frequente"><span>Frequente</span></label></div></div>
+      <div class="q"><span class="label">O que mais dá trabalho na parte burocrática? <span class="hint">Marque todos</span></span><div class="opts">
+        <label class="opt"><input type="checkbox" name="burocracia" value="Ficha do hóspede (FNRH)"><span>Ficha do hóspede (FNRH)</span></label>
+        <label class="opt"><input type="checkbox" name="burocracia" value="Nota fiscal"><span>Nota fiscal</span></label>
+        <label class="opt"><input type="checkbox" name="burocracia" value="Reforma tributária"><span>Reforma tributária</span></label>
+        <label class="opt"><input type="checkbox" name="burocracia" value="Cadastur"><span>Cadastur</span></label>
+        <label class="opt"><input type="checkbox" name="burocracia" value="Conferir pagamentos"><span>Conferir pagamentos</span></label>
+        <label class="opt"><input type="checkbox" name="burocracia" value="Nada"><span>Nada disso</span></label></div></div>
+      <div class="q"><span class="label">E com a equipe? <span class="hint">Marque todos</span></span><div class="opts">
+        <label class="opt"><input type="checkbox" name="equipe" value="Rotatividade alta"><span>Muita gente entra e sai</span></label>
+        <label class="opt"><input type="checkbox" name="equipe" value="Difícil treinar"><span>Difícil treinar</span></label>
+        <label class="opt"><input type="checkbox" name="equipe" value="Recepção sobrecarregada"><span>Recepção sobrecarregada</span></label>
+        <label class="opt"><input type="checkbox" name="equipe" value="Dono faz tudo"><span>O dono faz tudo</span></label>
+        <label class="opt"><input type="checkbox" name="equipe" value="Sem problemas"><span>Sem problemas</span></label></div></div>
+      <div class="q"><span class="label">Você pede e responde avaliações no Google e nas plataformas?</span><div class="opts">
+        <label class="opt"><input type="radio" name="avaliacoes" value="Sempre"><span>Sempre</span></label>
+        <label class="opt"><input type="radio" name="avaliacoes" value="Às vezes"><span>Às vezes</span></label>
+        <label class="opt"><input type="radio" name="avaliacoes" value="Quase nunca"><span>Quase nunca</span></label></div></div>
+    </fieldset>
+
+    <!-- ETAPA 5 -->
+    <fieldset class="step" data-step="5" hidden>
+      <legend>O que mais incomoda</legend>
+      <div class="q"><span class="label">Quanto cada item incomoda hoje?</span>
+        <div class="legend-scale"><span>1 = não incomoda</span><span>5 = incomoda muito</span></div>
+        <div class="grid" id="painGrid"></div></div>
+      <div class="q"><label for="varinha">Se você pudesse resolver um único problema amanhã, qual seria?</label><textarea id="varinha" name="varinha"></textarea></div>
+      <div class="q"><span class="label">Quanto pagaria por mês por uma ferramenta que resolvesse esse problema?</span><div class="opts">
+        <label class="opt"><input type="radio" name="investe" value="Nada"><span>Nada</span></label>
+        <label class="opt"><input type="radio" name="investe" value="Até R$100"><span>Até R$ 100</span></label>
+        <label class="opt"><input type="radio" name="investe" value="R$100-300"><span>R$ 100 a 300</span></label>
+        <label class="opt"><input type="radio" name="investe" value="R$300-600"><span>R$ 300 a 600</span></label>
+        <label class="opt"><input type="radio" name="investe" value="Mais de R$600"><span>Mais de R$ 600</span></label></div></div>
+      <div class="q"><span class="label">Topa ver uma demonstração quando a ferramenta estiver pronta?</span><div class="opts">
+        <label class="opt"><input type="radio" name="conversa" value="Sim"><span>Sim</span></label>
+        <label class="opt"><input type="radio" name="conversa" value="Não"><span>Agora não</span></label></div></div>
+      <div class="q"><label for="contato">WhatsApp ou e-mail para contato</label><input id="contato" name="contato" type="text"></div>
+    </fieldset>
+
+    <!-- ETAPA 6: só para o entrevistador -->
+    <fieldset class="step" data-step="6" hidden>
+      <legend>Fechamento</legend>
+      <p class="hint" style="margin:-12px 0 0">Preencha depois da conversa. Esta parte é só para você.</p>
+      <div class="q"><span class="label">Temperatura do lead</span><div class="opts">
+        <label class="opt"><input type="radio" name="temperatura" value="Frio"><span>Frio</span></label>
+        <label class="opt"><input type="radio" name="temperatura" value="Morno"><span>Morno</span></label>
+        <label class="opt"><input type="radio" name="temperatura" value="Quente"><span>Quente</span></label></div></div>
+      <div class="q"><span class="label">Quem decide a compra?</span><div class="opts">
+        <label class="opt"><input type="radio" name="decisor" value="Falei com quem decide"><span>Falei com quem decide</span></label>
+        <label class="opt"><input type="radio" name="decisor" value="Decisor é outra pessoa"><span>Decisor é outra pessoa</span></label>
+        <label class="opt"><input type="radio" name="decisor" value="Não sei"><span>Não sei</span></label></div></div>
+      <div class="q"><span class="label">Próximo passo</span><div class="opts">
+        <label class="opt"><input type="radio" name="proximo_passo" value="Mostrar demo"><span>Mostrar demo</span></label>
+        <label class="opt"><input type="radio" name="proximo_passo" value="Mandar proposta"><span>Mandar proposta</span></label>
+        <label class="opt"><input type="radio" name="proximo_passo" value="Piloto grátis"><span>Piloto grátis</span></label>
+        <label class="opt"><input type="radio" name="proximo_passo" value="Voltar a falar depois"><span>Voltar a falar depois</span></label>
+        <label class="opt"><input type="radio" name="proximo_passo" value="Sem interesse"><span>Sem interesse</span></label></div></div>
+      <div class="q"><label for="data_retorno">Data para retomar o contato</label><input id="data_retorno" name="data_retorno" type="date"></div>
+      <div class="q"><label for="frase_chave">Frase marcante do entrevistado <span class="hint">Do jeito que ele falou</span></label><textarea id="frase_chave" name="frase_chave"></textarea></div>
+      <div class="q"><label for="obs">Observações gerais <span class="hint">Estrutura, clima, o que você percebeu</span></label><textarea id="obs" name="obs"></textarea></div>
+    </fieldset>
+
+    <p class="error" id="err" role="alert"></p>
+    <div class="nav">
+      <button type="button" id="back" hidden>Voltar</button>
+      <button type="button" class="primary" id="next">Continuar</button>
+    </div>
+
+    <div class="done" id="done" hidden>
+      <h2 id="doneTitle">Entrevista salva</h2>
+      <p id="doneMsg"></p>
+      <button type="button" class="primary" id="again" style="margin:20px auto 0">Nova entrevista</button>
+    </div>
+  </form>
+
+  <p class="foot">Sem internet? Tudo bem. A entrevista fica salva neste aparelho e é enviada sozinha quando a conexão voltar.</p>
+</div>
+
+<script>
+const PAINS = [
+  ["dor_comissao","Comissão das plataformas (Booking, Expedia…)"],
+  ["dor_whatsapp","Volume de mensagens no WhatsApp"],
+  ["dor_overbooking","Controle de reservas e overbooking"],
+  ["dor_preco","Saber quanto cobrar na diária"],
+  ["dor_pagamento","Cobrança, sinal e no-show"],
+  ["dor_burocracia","Burocracia, nota fiscal e impostos"],
+  ["dor_equipe","Equipe e treinamento"],
+  ["dor_avaliacoes","Avaliações e reputação online"]
+];
+const grid = document.getElementById("painGrid");
+PAINS.forEach(([name,label])=>{
+  const row = document.createElement("div"); row.className="row";
+  row.innerHTML = `<span class="t">${label}</span><div class="scale">` +
+    [1,2,3,4,5].map(n=>`<label class="opt"><input type="radio" name="${name}" value="${n}" aria-label="${label}: ${n}"><span>${n}</span></label>`).join("") + `</div>`;
+  grid.appendChild(row);
+});
+
+const form = document.getElementById("f");
+const steps = [...form.querySelectorAll(".step")];
+const back = document.getElementById("back"), next = document.getElementById("next");
+const err = document.getElementById("err");
+const QUEUE_KEY = "entrevistas_pendentes";
+let cur = 0;
+
+// Campo de notas livres no fim das etapas da entrevista (não no fechamento)
+steps.slice(0, 5).forEach((s, i) => {
+  const d = document.createElement("div");
+  d.className = "q notes";
+  d.innerHTML = `<label for="notas_${i+1}">Suas notas desta etapa <span class="hint">O que a pessoa contou, com as palavras dela</span></label><textarea id="notas_${i+1}" name="notas_${i+1}"></textarea>`;
+  s.appendChild(d);
+});
+
+// Pré-preenche pelo link: ?lead=123&hotel=Pousada%20X&cidade=Paraty/RJ&origem=Captação%20n8n
+function prefill(){
+  const p = new URLSearchParams(location.search);
+  const map = {lead:"id_lead", hotel:"nome_hotel", cidade:"cidade", origem:"origem", contato:"contato"};
+  for (const [k, id] of Object.entries(map)) if (p.get(k)) document.getElementById(id).value = p.get(k);
+}
+
+function show(i){
+  steps.forEach((s,k)=>s.hidden = k!==i);
+  cur = i;
+  back.hidden = i===0;
+  next.textContent = i===steps.length-1 ? "Salvar entrevista" : "Continuar";
+  document.getElementById("stepLabel").textContent = `Etapa ${i+1} de ${steps.length}`;
+  document.getElementById("barFill").style.width = ((i+1)/steps.length*100)+"%";
+  err.textContent = "";
+  form.scrollIntoView({block:"start", behavior:"smooth"});
+}
+
+function validStep(){
+  const missing = [...steps[cur].querySelectorAll("[required]")].filter(el=>!el.value.trim());
+  if (missing.length){ err.textContent = "Preencha os campos marcados com *."; missing[0].focus(); return false; }
+  return true;
+}
+
+function collect(){
+  const fd = new FormData(form), out = {};
+  for (const el of form.elements){
+    if (!el.name || el.name in out) continue;
+    out[el.name] = fd.getAll(el.name).join("; ");
+  }
+  out.dores_fortes = PAINS.filter(([n]) => Number(out[n]) >= 4).map(([n]) => n.replace("dor_","")).join(", ");
+  out.entrevista_em = new Date().toISOString();
+  return out;
+}
+
+// ---- Fila local: nada se perde se a internet cair ----
+function readQueue(){ try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; } catch(e){ return []; } }
+function writeQueue(q){ try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
+
+async function send(data){
+  const isAppsScript = ENDPOINT.includes("script.google.com");
+  const res = await fetch(ENDPOINT, isAppsScript
+    ? {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(data)}
+    : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+  if (!isAppsScript && !res.ok) throw new Error("HTTP " + res.status);
+}
+
+async function flush(){
+  if (!ENDPOINT) return renderPending();
+  let q = readQueue();
+  while (q.length){
+    try { await send(q[0]); } catch(e){ break; }
+    q.shift(); writeQueue(q);
+  }
+  renderPending();
+}
+
+function renderPending(){
+  const n = readQueue().length, el = document.getElementById("pending");
+  el.hidden = n === 0;
+  if (!n) return;
+  el.innerHTML = ENDPOINT
+    ? `<span>${n} entrevista(s) aguardando envio.</span><button type="button" id="retry">Enviar agora</button>`
+    : `<span>${n} entrevista(s) salva(s) neste aparelho. Configure o ENDPOINT para enviar.</span>`;
+  const r = document.getElementById("retry");
+  if (r) r.onclick = flush;
+}
+
+back.addEventListener("click", ()=>show(cur-1));
+next.addEventListener("click", async ()=>{
+  if (!validStep()) return;
+  if (cur < steps.length-1) return show(cur+1);
+  const data = collect();
+  const q = readQueue(); q.push(data); writeQueue(q);
+  next.disabled = true; next.textContent = "Salvando…";
+  await flush();
+  next.disabled = false;
+  const sent = !readQueue().some(d => d.entrevista_em === data.entrevista_em);
+  document.getElementById("doneTitle").textContent = sent ? "Entrevista enviada" : "Entrevista salva";
+  document.getElementById("doneMsg").textContent = sent
+    ? `${data.nome_hotel} foi registrado.`
+    : `${data.nome_hotel} ficou salvo neste aparelho e será enviado quando houver conexão.`;
+  finish();
+});
+
+document.getElementById("again").addEventListener("click", ()=>{
+  form.reset();
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("done").hidden = true;
+  document.querySelector(".nav").hidden = false;
+  document.querySelector(".progress").hidden = false;
+  show(0);
+});
+
+function finish(){
+  steps.forEach(s=>s.hidden=true);
+  document.querySelector(".nav").hidden = true;
+  document.querySelector(".progress").hidden = true;
+  document.getElementById("done").hidden = false;
+}
+
+window.addEventListener("online", flush);
+prefill();
+show(0);
+flush();
+</script>
+</body>
+</html>
