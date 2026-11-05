@@ -1,12 +1,15 @@
 {
-  "name": "Captação de hotéis (Google Maps)",
+  "name": "Captação de hotéis (Google Maps via RapidAPI)",
   "nodes": [
     {
       "id": "a1f0c001-0000-4000-8000-000000000001",
       "name": "Formulário de busca",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
-      "position": [0, 0],
+      "position": [
+        220,
+        0
+      ],
       "webhookId": "a1f0c001-0000-4000-8000-0000000000ff",
       "parameters": {
         "formTitle": "Captar hotéis",
@@ -26,11 +29,21 @@
               "requiredField": true,
               "fieldOptions": {
                 "values": [
-                  { "option": "pousada" },
-                  { "option": "hotel" },
-                  { "option": "hostel" },
-                  { "option": "motel" },
-                  { "option": "chalé" }
+                  {
+                    "option": "pousada"
+                  },
+                  {
+                    "option": "hotel"
+                  },
+                  {
+                    "option": "hostel"
+                  },
+                  {
+                    "option": "motel"
+                  },
+                  {
+                    "option": "chalé"
+                  }
                 ]
               }
             }
@@ -44,14 +57,27 @@
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 0],
+      "position": [
+        440,
+        100
+      ],
       "parameters": {
         "mode": "manual",
         "includeOtherFields": true,
         "assignments": {
           "assignments": [
-            { "id": "c1", "name": "api_key", "type": "string", "value": "COLE_SUA_CHAVE_DO_GOOGLE_PLACES" },
-            { "id": "c2", "name": "questionario_url", "type": "string", "value": "https://oxdrtech.github.io/questionario-hoteis/" }
+            {
+              "id": "c1",
+              "name": "api_key",
+              "type": "string",
+              "value": "COLE_SUA_CHAVE_DA_RAPIDAPI"
+            },
+            {
+              "id": "c2",
+              "name": "questionario_url",
+              "type": "string",
+              "value": "https://oxdrtech.github.io/questionario-hoteis/"
+            }
           ]
         },
         "options": {}
@@ -62,7 +88,10 @@
       "name": "Montar buscas",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0],
+      "position": [
+        660,
+        100
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "// Uma busca para cada combinação de cidade x tipo\nconst f = $input.first().json;\nconst cidades = String(f.Cidades || '').split('\\n').map(s => s.trim()).filter(Boolean);\nlet tipos = f.Tipos;\nif (!Array.isArray(tipos)) tipos = String(tipos || 'pousada').split(',').map(s => s.trim());\nconst out = [];\nfor (const c of cidades) for (const t of tipos) out.push({ json: { textQuery: `${t} em ${c}` } });\nreturn out;"
@@ -70,36 +99,59 @@
     },
     {
       "id": "a1f0c001-0000-4000-8000-000000000004",
-      "name": "Google Places",
+      "name": "Maps Data (RapidAPI)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0],
+      "position": [
+        880,
+        100
+      ],
       "parameters": {
-        "method": "POST",
-        "url": "https://places.googleapis.com/v1/places:searchText",
+        "method": "GET",
+        "url": "https://maps-data.p.rapidapi.com/searchmaps.php",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $json.textQuery }}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "country",
+              "value": "br"
+            },
+            {
+              "name": "lang",
+              "value": "pt"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            }
+          ]
+        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Goog-Api-Key", "value": "={{ $('Config').first().json.api_key }}" },
-            { "name": "X-Goog-FieldMask", "value": "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.googleMapsUri,places.businessStatus,places.types,nextPageToken" }
+            {
+              "name": "x-rapidapi-host",
+              "value": "maps-data.p.rapidapi.com"
+            },
+            {
+              "name": "x-rapidapi-key",
+              "value": "={{ $('Config').first().json.api_key }}"
+            }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ textQuery: $json.textQuery, languageCode: 'pt-BR', regionCode: 'BR', pageSize: 20 }) }}",
         "options": {
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  { "type": "body", "name": "pageToken", "value": "={{ $response.body.nextPageToken }}" }
-                ]
-              },
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.nextPageToken }}",
-              "limitPagesFetched": true,
-              "maxRequests": 3,
-              "requestInterval": 2000
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
             }
           }
         }
@@ -110,9 +162,12 @@
       "name": "Separar lugares",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [880, 0],
+      "position": [
+        1100,
+        100
+      ],
       "parameters": {
-        "fieldToSplitOut": "places",
+        "fieldToSplitOut": "data",
         "options": {}
       }
     },
@@ -121,10 +176,13 @@
       "name": "Normalizar e pontuar",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 0],
+      "position": [
+        1320,
+        100
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Limpa, remove duplicados, descarta o que não é hospedagem e dá uma nota de prioridade\nconst cfg = $('Config').first().json;\nconst HOSPEDAGEM = ['lodging','hotel','inn','motel','hostel','bed_and_breakfast','guest_house','resort_hotel','farmstay','cottage','campground','extended_stay_hotel','budget_japanese_inn','private_guest_room'];\nconst seen = new Set();\nconst out = [];\nconst agora = new Date().toISOString();\n\nfor (const item of $input.all()) {\n  const p = item.json;\n  if (!p.id || seen.has(p.id)) continue;\n  seen.add(p.id);\n  if (p.businessStatus && p.businessStatus !== 'OPERATIONAL') continue;\n  if (!(p.types || []).some(t => HOSPEDAGEM.includes(t))) continue;\n\n  const nome = p.displayName?.text || '';\n  const endereco = p.formattedAddress || '';\n  const m = endereco.match(/^(.*)\\s-\\s([A-Z]{2})\\s*,/);\n  const cidade = m ? m[1].split(/,|\\s-\\s/).pop().trim() : '';\n  const uf = m ? m[2] : '';\n  const telefone = p.nationalPhoneNumber || '';\n  const dig = telefone.replace(/\\D/g, '');\n  const celular = dig.length === 11 && dig[2] === '9';\n  const site = p.websiteUri || '';\n  const nota = p.rating ?? '';\n  const avaliacoes = p.userRatingCount ?? 0;\n  const siteEhOta = /booking\\.com|airbnb|expedia|decolar|trivago|hoteis\\.com|instagram\\.com|facebook\\.com|wa\\.me/i.test(site);\n\n  // Prioridade: quanto maior, mais provável que tenha as dores que você resolve\n  let score = 0;\n  const motivos = [];\n  if (!site || siteEhOta) { score += 3; motivos.push(site ? 'site é OTA/rede social' : 'sem site'); }\n  if (celular) { score += 2; motivos.push('celular (provável WhatsApp)'); }\n  if (avaliacoes >= 20 && avaliacoes <= 400) { score += 2; motivos.push('porte pequeno/médio'); }\n  if (avaliacoes > 1500) { score -= 2; motivos.push('muito grande (provável rede)'); }\n  if (nota !== '' && nota < 4.3) { score += 1; motivos.push('nota abaixo de 4,3'); }\n  if (!telefone) { score -= 2; motivos.push('sem telefone'); }\n\n  const params = new URLSearchParams({ lead: p.id, hotel: nome, cidade: cidade && uf ? `${cidade}/${uf}` : cidade, origem: 'Captação n8n', contato: telefone });\n\n  out.push({ json: {\n    place_id: p.id,\n    nome, cidade, uf, endereco, telefone,\n    whatsapp: celular ? `https://wa.me/55${dig}` : '',\n    site, nota, avaliacoes,\n    maps: p.googleMapsUri || '',\n    score, motivos: motivos.join('; '),\n    link_entrevista: `${cfg.questionario_url}?${params.toString()}`,\n    status: 'Novo',\n    temperatura: '', proximo_passo: '', data_retorno: '',\n    capturado_em: agora\n  }});\n}\nreturn out;"
+        "jsCode": "// Limpa, remove duplicados, descarta o que não é hospedagem e dá uma nota de prioridade\nconst cfg = $('Config').first().json;\nconst HOSPEDAGEM = /hotel|pousada|hospedaria|hospedagem|motel|hostel|albergue|chal[eé]|resort|pens[aã]o|camping|flat|apart|cama e caf|acomoda|lodging|inn\\b|bed and breakfast|guest/i;\nconst seen = new Set();\nconst out = [];\nconst agora = new Date().toISOString();\n\nfor (const item of $input.all()) {\n  const p = item.json;\n  const id = p.place_id || p.business_id;\n  if (!id || seen.has(id)) continue;\n  seen.add(id);\n  if (p.is_permanently_closed) continue;\n  if (!(p.types || []).some(t => HOSPEDAGEM.test(t))) continue;\n\n  const nome = p.name || '';\n  const endereco = (p.full_address || '').replace(nome + ' - ', '');\n  const m = (p.city || '').match(/^(.*?)\\s*-\\s*([A-Z]{2})$/);\n  const cidade = m ? m[1].trim() : (p.city || '');\n  const uf = m ? m[2] : '';\n\n  // Telefone vem como 081987591121 ou +55 81 98759-1121: normaliza para DDD + número\n  let dig = String(p.phone_number || '').replace(/\\D/g, '');\n  if (dig.startsWith('55') && dig.length >= 12) dig = dig.slice(2);\n  dig = dig.replace(/^0+/, '');\n  const celular = dig.length === 11 && dig[2] === '9';\n  const telefone = dig.length === 11 ? '(' + dig.slice(0,2) + ') ' + dig.slice(2,7) + '-' + dig.slice(7)\n                 : dig.length === 10 ? '(' + dig.slice(0,2) + ') ' + dig.slice(2,6) + '-' + dig.slice(6)\n                 : (p.phone_number || '');\n\n  const site = p.website || '';\n  const nota = p.rating ?? '';\n  const avaliacoes = p.review_count ?? 0;\n  const siteEhOta = /booking\\.com|airbnb|expedia|decolar|trivago|hoteis\\.com|instagram\\.com|facebook\\.com|wa\\.me|linktr\\.ee|bit\\.ly/i.test(site);\n\n  // Prioridade: quanto maior, mais provável que tenha as dores que você resolve\n  let score = 0;\n  const motivos = [];\n  if (!site || siteEhOta) { score += 3; motivos.push(site ? 'site é OTA/rede social' : 'sem site'); }\n  if (celular) { score += 2; motivos.push('celular (provável WhatsApp)'); }\n  if (avaliacoes >= 20 && avaliacoes <= 400) { score += 2; motivos.push('porte pequeno/médio'); }\n  if (avaliacoes > 1500) { score -= 2; motivos.push('muito grande (provável rede)'); }\n  if (nota !== '' && nota < 4.3) { score += 1; motivos.push('nota abaixo de 4,3'); }\n  if (!dig) { score -= 2; motivos.push('sem telefone'); }\n\n  // O sandbox do n8n não tem URLSearchParams: monta a query na mão\n  const query = Object.entries({ lead: id, hotel: nome, cidade: cidade && uf ? cidade + '/' + uf : cidade, origem: 'Captação n8n', contato: telefone })\n    .map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n\n  out.push({ json: {\n    place_id: id,\n    nome, cidade, uf, endereco, telefone,\n    whatsapp: celular ? 'https://wa.me/55' + dig : '',\n    site, nota, avaliacoes,\n    maps: p.place_link || '',\n    score, motivos: motivos.join('; '),\n    link_entrevista: cfg.questionario_url + '?' + query,\n    status: 'Novo',\n    temperatura: '', proximo_passo: '', data_retorno: '',\n    capturado_em: agora\n  }});\n}\nreturn out;"
       }
     },
     {
@@ -132,7 +190,10 @@
       "name": "Salvar leads no Postgres",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1320, 0],
+      "position": [
+        1540,
+        100
+      ],
       "executeOnce": true,
       "alwaysOutputData": true,
       "parameters": {
@@ -141,20 +202,135 @@
         "options": {
           "queryReplacement": "={{ [ JSON.stringify($('Normalizar e pontuar').all().map(i => i.json)) ] }}"
         }
-      },
-      "credentials": {
-        "postgres": { "id": "", "name": "Postgres capitacao_hoteis" }
       }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "captar",
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "a1f0c001-0000-4000-8000-000000000008",
+      "name": "Webhook (painel)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "captar-hoteis"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Mesma senha do nó 'Checar senha' do workflow do painel\nconst SENHA = 'TROQUE_ESTA_SENHA';\n\nconst body = $input.first().json.body || {};\nif (SENHA === 'TROQUE_ESTA_SENHA' || body.senha !== SENHA) throw new Error('Senha incorreta');\n// Deixa no mesmo formato que o formulário entrega\nreturn [{ json: { Cidades: String(body.cidades || ''), Tipos: Array.isArray(body.tipos) ? body.tipos : [] } }];"
+      },
+      "id": "a1f0c001-0000-4000-8000-000000000009",
+      "name": "Checar senha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        200
+      ]
     }
   ],
   "connections": {
-    "Formulário de busca": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
-    "Config": { "main": [[{ "node": "Montar buscas", "type": "main", "index": 0 }]] },
-    "Montar buscas": { "main": [[{ "node": "Google Places", "type": "main", "index": 0 }]] },
-    "Google Places": { "main": [[{ "node": "Separar lugares", "type": "main", "index": 0 }]] },
-    "Separar lugares": { "main": [[{ "node": "Normalizar e pontuar", "type": "main", "index": 0 }]] },
-    "Normalizar e pontuar": { "main": [[{ "node": "Salvar leads no Postgres", "type": "main", "index": 0 }]] }
+    "Formulário de busca": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Montar buscas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar buscas": {
+      "main": [
+        [
+          {
+            "node": "Maps Data (RapidAPI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar lugares": {
+      "main": [
+        [
+          {
+            "node": "Normalizar e pontuar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar e pontuar": {
+      "main": [
+        [
+          {
+            "node": "Salvar leads no Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Maps Data (RapidAPI)": {
+      "main": [
+        [
+          {
+            "node": "Separar lugares",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (painel)": {
+      "main": [
+        [
+          {
+            "node": "Checar senha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar senha": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "pinData": {}
 }

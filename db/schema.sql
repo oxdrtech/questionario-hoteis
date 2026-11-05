@@ -114,9 +114,10 @@ CREATE INDEX IF NOT EXISTS entrevistas_retorno_idx ON entrevistas (data_retorno)
 -- Recebe a lista de leads do nó "Normalizar e pontuar", grava só os
 -- novos e devolve os que entraram agora.
 -- =========================================================
-CREATE OR REPLACE FUNCTION salvar_leads(lista JSONB)
+DROP FUNCTION IF EXISTS salvar_leads(JSONB); -- o retorno mudou (entrou o site); precisa recriar
+CREATE FUNCTION salvar_leads(lista JSONB)
 RETURNS TABLE (place_id TEXT, nome TEXT, cidade TEXT, uf CHAR(2), telefone TEXT, whatsapp TEXT,
-               score SMALLINT, motivos TEXT, link_entrevista TEXT)
+               site TEXT, score SMALLINT, motivos TEXT, link_entrevista TEXT)
 LANGUAGE sql AS $$
   INSERT INTO leads AS l (place_id, nome, cidade, uf, endereco, telefone, whatsapp, site, nota,
                           avaliacoes, maps, score, motivos, link_entrevista, status, capturado_em)
@@ -131,8 +132,29 @@ LANGUAGE sql AS $$
   FROM jsonb_array_elements(lista) AS x
   WHERE COALESCE(x->>'place_id','') <> ''
   ON CONFLICT ON CONSTRAINT leads_pkey DO NOTHING
-  RETURNING l.place_id, l.nome, l.cidade, l.uf, l.telefone, l.whatsapp, l.score, l.motivos, l.link_entrevista;
+  RETURNING l.place_id, l.nome, l.cidade, l.uf, l.telefone, l.whatsapp, l.site, l.score, l.motivos, l.link_entrevista;
 $$;
+
+-- =========================================================
+-- ROTINA DO DIA: consultas prontas
+-- =========================================================
+-- Quem abordar hoje: leads novos, do mais promissor para o menos
+CREATE OR REPLACE VIEW fila_contato AS
+  SELECT place_id, nome, cidade, uf, telefone, whatsapp, site, nota, avaliacoes, score, motivos, link_entrevista, maps
+  FROM leads
+  WHERE status = 'Novo'
+  ORDER BY score DESC, avaliacoes DESC NULLS LAST;
+
+-- Quem cobrar: retornos marcados para hoje ou atrasados
+CREATE OR REPLACE VIEW retornos AS
+  SELECT place_id, nome, cidade, uf, telefone, whatsapp, status, temperatura, proximo_passo, data_retorno, link_entrevista
+  FROM leads
+  WHERE data_retorno <= CURRENT_DATE AND status NOT IN ('Descartado', 'Fechado')
+  ORDER BY data_retorno, temperatura;
+
+-- Placar: quantos leads em cada etapa
+CREATE OR REPLACE VIEW funil AS
+  SELECT status, count(*) AS leads FROM leads GROUP BY status ORDER BY count(*) DESC;
 
 -- =========================================================
 -- Usada pelo webhook do questionário: SELECT salvar_entrevista($1::jsonb);
@@ -196,4 +218,41 @@ BEGIN
   END IF;
 
   RETURN novo_id; -- NULL se era reenvio de uma entrevista já gravada
+END $$;
+
+-- =========================================================
+-- Usada pelo painel (painel.html via painel-webhook.json): SELECT painel($1::jsonb);
+-- acao = 'carregar'  → devolve todos os leads
+-- acao = 'atualizar' → muda status e/ou data de retorno de um ou mais leads e devolve tudo de novo
+--   ex.: {"acao":"atualizar","place_ids":["ChIJ..."],"status":"Contatado","data_retorno":"2026-11-10"}
+-- =========================================================
+CREATE OR REPLACE FUNCTION painel(j JSONB) RETURNS JSONB
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF j->>'acao' = 'atualizar' THEN
+    IF COALESCE(j->>'status','') <> ''
+       AND j->>'status' NOT IN ('Novo','Contatado','Entrevistado','Descartado','Fechado') THEN
+      RAISE EXCEPTION 'Status inválido: %', j->>'status';
+    END IF;
+    UPDATE leads SET
+      status        = COALESCE(NULLIF(j->>'status',''), status),
+      data_retorno  = CASE WHEN j ? 'data_retorno' THEN NULLIF(j->>'data_retorno','')::DATE ELSE data_retorno END,
+      atualizado_em = now()
+    WHERE place_id IN (SELECT jsonb_array_elements_text(j->'place_ids'));
+  END IF;
+
+  RETURN jsonb_build_object(
+    'hoje', CURRENT_DATE,
+    'leads', COALESCE((
+      SELECT jsonb_agg(to_jsonb(l) || jsonb_build_object(
+               'frase_chave', e.frase_chave, 'dores_fortes', e.dores_fortes,
+               'entrevista_em', e.entrevista_em, 'nome_pessoa', e.nome_pessoa)
+             ORDER BY l.score DESC, l.avaliacoes DESC NULLS LAST)
+      FROM leads l
+      LEFT JOIN LATERAL (
+        SELECT frase_chave, dores_fortes, entrevista_em, nome_pessoa FROM entrevistas
+        WHERE entrevistas.place_id = l.place_id ORDER BY entrevista_em DESC LIMIT 1
+      ) e ON true
+    ), '[]'::jsonb)
+  );
 END $$;
