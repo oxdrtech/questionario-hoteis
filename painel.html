@@ -77,7 +77,14 @@ input,select{font:inherit;color:var(--ink);background:var(--card);border:1px sol
 .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
 .head h3{margin:0;font-size:16px;font-weight:700;overflow-wrap:anywhere}
 .meta{font-size:13px;color:var(--muted)}
-.why{font-size:13px;color:var(--muted)}
+.sinais{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;max-width:340px}
+.sinal{display:flex;align-items:center;gap:6px;font-size:13px;padding:3px 4px 3px 9px;border-radius:8px;
+  background:var(--bg);border:1px solid var(--line)}
+.sinal b{margin-left:auto;font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums;background:var(--soft);color:var(--muted)}
+.sinal.pos b{background:var(--accent);color:var(--accent-ink)}
+.sinal.neg{background:var(--warn-bg);border-color:transparent;color:var(--warn-ink)}
+.sinal.neg b{background:var(--warn-ink);color:var(--warn-bg)}
+.btn.off{opacity:.38;cursor:not-allowed;filter:grayscale(1)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
 .chip{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--ink)}
 .chip.late{background:var(--warn-bg);color:var(--warn-ink);font-weight:600}
@@ -248,29 +255,58 @@ function render(){
   $("more").hidden = arr.length <= shown;
 }
 
+// Traduz os "motivos" do score em sinais visuais, com os pontos de cada um
+const SINAIS = [
+  {re:/^sem site$/,              emoji:"🌐", txt:"Sem site próprio",          pts:+3},
+  {re:/^site é OTA/,             emoji:"🔗", txt:"Site é OTA/rede social",    pts:+3},
+  {re:/^celular/,                emoji:"📱", txt:"WhatsApp provável",         pts:+2},
+  {re:/^porte pequeno/,          emoji:"🏡", txt:"Porte pequeno/médio",       pts:+2},
+  {re:/^nota abaixo/,            emoji:"⭐", txt:"Nota abaixo de 4,3",        pts:+1},
+  {re:/^muito grande/,           emoji:"🏢", txt:"Grande demais (provável rede)", pts:-2},
+  {re:/^sem telefone/,           emoji:"📵", txt:"Sem telefone",              pts:-2},
+];
+function sinais(l){
+  const itens = String(l.motivos || "").split(";").map(s => s.trim()).filter(Boolean);
+  if (!itens.length) return `<div class="sinais"></div>`;
+  return `<ul class="sinais" aria-label="Por que esse score">${itens.map(m => {
+    const s = SINAIS.find(x => x.re.test(m)) || {emoji:"•", txt:m, pts:0};
+    let txt = s.txt;
+    if (s.emoji === "🔗" && l.site){ try { txt = "Site é " + new URL(l.site).hostname.replace(/^www\./, ""); } catch(e){} }
+    const cls = s.pts > 0 ? "pos" : s.pts < 0 ? "neg" : "";
+    return `<li class="sinal ${cls}"><span aria-hidden="true">${s.emoji}</span> ${esc(txt)}${s.pts ? `<b>${s.pts > 0 ? "+" : "−"}${Math.abs(s.pts)}</b>` : ""}</li>`;
+  }).join("")}</ul>`;
+}
+const temperaturaEmoji = t => /quent/i.test(t) ? "🔥" : /morn/i.test(t) ? "🌤️" : /fri/i.test(t) ? "🧊" : "🌡️";
+
 function card(l){
   const tel = String(l.telefone || "").replace(/\D/g, "");
   const atrasado = l.data_retorno && l.data_retorno.slice(0,10) < hoje;
   const chips = [];
-  if (tab === "Retornos") chips.push(`<span class="chip">${esc(l.status)}</span>`);
-  if (l.temperatura) chips.push(`<span class="chip">${esc(l.temperatura)}</span>`);
-  if (l.proximo_passo) chips.push(`<span class="chip">${esc(l.proximo_passo)}</span>`);
-  if (l.data_retorno) chips.push(`<span class="chip${isRetorno(l) ? " late" : ""}">Retorno ${fmtData(l.data_retorno)}${atrasado ? " (atrasado)" : ""}</span>`);
-  if (l.dores_fortes) chips.push(`<span class="chip">Dores: ${esc(l.dores_fortes)}</span>`);
+  if (tab === "Retornos") chips.push(`<span class="chip">📌 ${esc(l.status)}</span>`);
+  if (l.nome_pessoa) chips.push(`<span class="chip">👤 ${esc(l.nome_pessoa)}</span>`);
+  if (l.temperatura) chips.push(`<span class="chip">${temperaturaEmoji(l.temperatura)} ${esc(l.temperatura)}</span>`);
+  if (l.proximo_passo) chips.push(`<span class="chip">➡️ ${esc(l.proximo_passo)}</span>`);
+  if (l.data_retorno) chips.push(`<span class="chip${isRetorno(l) ? " late" : ""}">📅 Retorno ${fmtData(l.data_retorno)}${atrasado ? " (atrasado)" : ""}</span>`);
+  if (l.dores_fortes) chips.push(`<span class="chip">😣 Dores: ${esc(l.dores_fortes)}</span>`);
+
+  // Botões sempre visíveis; sem o dado, aparecem apagados
+  const link = (ok, href, emoji, txt, falta, externo = true) => ok
+    ? `<a class="btn" href="${esc(href)}"${externo ? ` target="_blank" rel="noopener"` : ""}><span aria-hidden="true">${emoji}</span> ${txt}</a>`
+    : `<span class="btn off" aria-disabled="true" title="${falta}"><span aria-hidden="true">${emoji}</span> ${txt}</span>`;
 
   const rapido = {Novo:["Contatado","Contatei"], Contatado:["Novo","Voltar pra fila"], Entrevistado:["Fechado","Fechou"]}[l.status];
   return `<article class="card" data-id="${esc(l.place_id)}">
     <div class="score${l.score >= 6 ? " top" : ""}" title="Score de prioridade">${esc(l.score)}</div>
     <div class="head"><h3>${esc(l.nome)}</h3>
       <span class="meta">${esc([l.cidade, l.uf].filter(Boolean).join("/"))}${l.nota ? ` · ★ ${esc(l.nota)} (${esc(l.avaliacoes)})` : ""}${l.telefone ? ` · ${esc(l.telefone)}` : ""}</span></div>
-    <div class="why">${esc(l.motivos || "")}${l.nome_pessoa ? ` · Falou com ${esc(l.nome_pessoa)}` : ""}</div>
+    ${sinais(l)}
     <div>${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}${l.frase_chave ? `<p class="quote">“${esc(l.frase_chave)}”</p>` : ""}</div>
     <div class="actions">
-      ${l.whatsapp ? `<a class="btn" href="${esc(l.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
-      ${tel ? `<a class="btn" href="tel:+55${tel}">Ligar</a>` : ""}
-      ${l.site ? `<a class="btn" href="${esc(l.site)}" target="_blank" rel="noopener">Site</a>` : ""}
-      ${l.maps ? `<a class="btn" href="${esc(l.maps)}" target="_blank" rel="noopener">Maps</a>` : ""}
-      ${l.link_entrevista ? `<a class="btn" href="${esc(l.link_entrevista)}" target="_blank" rel="noopener">Entrevista</a>` : ""}
+      ${link(l.whatsapp, l.whatsapp, "💬", "WhatsApp", "Telefone não é celular")}
+      ${link(tel, "tel:+55" + tel, "📞", "Ligar", "Sem telefone", false)}
+      ${link(l.site, l.site, "🌐", "Site", "Sem site")}
+      ${link(l.maps, l.maps, "📍", "Maps", "Sem link do Maps")}
+      ${link(l.link_entrevista, l.link_entrevista, "📝", "Entrevista", "Sem link de entrevista")}
       <span class="sep"></span>
       <label>Retorno <input type="date" data-act="retorno" value="${esc((l.data_retorno||"").slice(0,10))}"></label>
       <select data-act="status" aria-label="Status">${STATUS.map(s => `<option${s===l.status?" selected":""}>${s}</option>`).join("")}</select>
