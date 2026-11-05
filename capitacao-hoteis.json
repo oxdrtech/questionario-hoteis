@@ -51,7 +51,7 @@
         "assignments": {
           "assignments": [
             { "id": "c1", "name": "api_key", "type": "string", "value": "COLE_SUA_CHAVE_DO_GOOGLE_PLACES" },
-            { "id": "c2", "name": "questionario_url", "type": "string", "value": "https://SEU-SITE/questionario-hoteis.html" }
+            { "id": "c2", "name": "questionario_url", "type": "string", "value": "https://oxdrtech.github.io/questionario-hoteis/" }
           ]
         },
         "options": {}
