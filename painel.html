@@ -300,7 +300,7 @@ $("more").addEventListener("click", () => { shown += PAGE; render(); });
 $("reload").addEventListener("click", load);
 $("logout").addEventListener("click", () => { senha = null; store.set("painel_senha", null); showLogin(); });
 $("login").addEventListener("submit", e => {
-  e.preventDefault(); senha = $("senha").value; store.set("painel_senha", senha); load();
+  e.preventDefault(); senha = $("senha").value.trim(); store.set("painel_senha", senha); load();
 });
 
 // ---- Captação: dispara o workflow capitacao-hoteis.json ----

@@ -227,7 +227,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Mesma senha do nó 'Checar senha' do workflow do painel\nconst SENHA = 'TROQUE_ESTA_SENHA';\n\nconst body = $input.first().json.body || {};\nif (SENHA === 'TROQUE_ESTA_SENHA' || body.senha !== SENHA) throw new Error('Senha incorreta');\n// Deixa no mesmo formato que o formulário entrega\nreturn [{ json: { Cidades: String(body.cidades || ''), Tipos: Array.isArray(body.tipos) ? body.tipos : [] } }];"
+        "jsCode": "// Mesma senha do nó 'Checar senha' do workflow do painel\nconst SENHA = 'TROQUE_ESTA_SENHA';\n\nconst body = $input.first().json.body || {};\nif (SENHA === 'TROQUE_ESTA_SENHA') throw new Error('Defina a SENHA neste nó');\nif (String(body.senha ?? '').trim() !== SENHA.trim()) throw new Error('Senha incorreta: recebi ' + (body.senha ? body.senha.length + ' caracteres' : 'nenhuma senha'));\n// Deixa no mesmo formato que o formulário entrega\nreturn [{ json: { Cidades: String(body.cidades || ''), Tipos: Array.isArray(body.tipos) ? body.tipos : [] } }];"
       },
       "id": "a1f0c001-0000-4000-8000-000000000009",
       "name": "Checar senha",
