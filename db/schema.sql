@@ -223,12 +223,19 @@ END $$;
 -- =========================================================
 -- Usada pelo painel (painel.html via painel-webhook.json): SELECT painel($1::jsonb);
 -- acao = 'carregar'  → devolve todos os leads
+-- acao = 'entrevista' → devolve todas as respostas de uma entrevista ({"acao":"entrevista","id":12})
 -- acao = 'atualizar' → muda status e/ou data de retorno de um ou mais leads e devolve tudo de novo
 --   ex.: {"acao":"atualizar","place_ids":["ChIJ..."],"status":"Contatado","data_retorno":"2026-11-10"}
 -- =========================================================
 CREATE OR REPLACE FUNCTION painel(j JSONB) RETURNS JSONB
 LANGUAGE plpgsql AS $$
 BEGIN
+  IF j->>'acao' = 'entrevista' THEN
+    RETURN jsonb_build_object('entrevista', (
+      SELECT e.dados_brutos || jsonb_build_object('id', e.id, 'place_id', e.place_id, 'recebido_em', e.recebido_em)
+      FROM entrevistas e WHERE e.id = (j->>'id')::BIGINT));
+  END IF;
+
   IF j->>'acao' = 'atualizar' THEN
     IF COALESCE(j->>'status','') <> ''
        AND j->>'status' NOT IN ('Novo','Contatado','Entrevistado','Descartado','Fechado') THEN
@@ -246,13 +253,23 @@ BEGIN
     'leads', COALESCE((
       SELECT jsonb_agg(to_jsonb(l) || jsonb_build_object(
                'frase_chave', e.frase_chave, 'dores_fortes', e.dores_fortes,
-               'entrevista_em', e.entrevista_em, 'nome_pessoa', e.nome_pessoa)
+               'entrevista_em', e.entrevista_em, 'nome_pessoa', e.nome_pessoa, 'entrevista_id', e.id)
              ORDER BY l.score DESC, l.avaliacoes DESC NULLS LAST)
       FROM leads l
       LEFT JOIN LATERAL (
-        SELECT frase_chave, dores_fortes, entrevista_em, nome_pessoa FROM entrevistas
+        SELECT id, frase_chave, dores_fortes, entrevista_em, nome_pessoa FROM entrevistas
         WHERE entrevistas.place_id = l.place_id ORDER BY entrevista_em DESC LIMIT 1
       ) e ON true
+    ), '[]'::jsonb),
+    -- Resumo de todas as entrevistas, inclusive as feitas sem link (sem lead ligado)
+    'entrevistas', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+               'id', e.id, 'place_id', e.place_id, 'nome_hotel', e.nome_hotel, 'cidade', e.cidade,
+               'nome_pessoa', e.nome_pessoa, 'cargo', e.cargo, 'entrevista_em', e.entrevista_em,
+               'temperatura', e.temperatura, 'proximo_passo', e.proximo_passo, 'data_retorno', e.data_retorno,
+               'dores_fortes', e.dores_fortes, 'frase_chave', e.frase_chave, 'investe', e.investe)
+             ORDER BY e.entrevista_em DESC)
+      FROM entrevistas e
     ), '[]'::jsonb)
   );
 END $$;
